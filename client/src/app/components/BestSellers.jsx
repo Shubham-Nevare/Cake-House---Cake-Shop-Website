@@ -1,22 +1,32 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useCart } from '../context/CartContext';
-import { products } from '../data/products';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { useToast } from '../context/ToastContext';
+import { useEffect, useState, useMemo } from "react";
+import { useCart } from "../context/CartContext";
+import { products } from "../data/products";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useToast } from "../context/ToastContext";
+import { FaHeart, FaRegHeart, FaStar, FaShoppingCart } from "react-icons/fa";
 
-const BestSellers = ({ query = '' }) => {
-  const [filteredProducts, setFilteredProducts] = useState(products);
-  const { addToCart, items: cartItems = [], removeProductById, openCart, updateQuantity } = useCart();
+const BestSellers = ({ query = "" }) => {
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const {
+    addToCart,
+    items: cartItems = [],
+    openCart,
+    updateQuantity,
+  } = useCart();
   const toast = useToast();
   const [favorites, setFavorites] = useState([]);
-  const [quantities, setQuantities] = useState({});
+
+  // Use useMemo to prevent recreation on every render - Only top 6 highest rated
+  const featuredProducts = useMemo(() => {
+    return [...products].sort((a, b) => b.rating - a.rating).slice(0, 6);
+  }, []);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('sd_favorites') || '[]';
+      const raw = localStorage.getItem("sd_favorites") || "[]";
       setFavorites(JSON.parse(raw));
     } catch (e) {
       setFavorites([]);
@@ -25,135 +35,280 @@ const BestSellers = ({ query = '' }) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('sd_favorites', JSON.stringify(favorites));
+      localStorage.setItem("sd_favorites", JSON.stringify(favorites));
     } catch (e) {
-      // ignore
+      /* ignore */
     }
   }, [favorites]);
 
   function toggleFavorite(id) {
-    // avoid calling toast.show from inside a state updater function
     const exists = favorites.includes(id);
-    const next = exists ? favorites.filter((x) => x !== id) : [id, ...favorites];
+    const next = exists
+      ? favorites.filter((x) => x !== id)
+      : [id, ...favorites];
     setFavorites(next);
-    // show notification after we schedule the update
-    toast.show(exists ? 'Removed from favorites' : 'Added to favorites', { type: 'info' });
+    toast.show(exists ? "Removed from favorites" : "Added to favorites", {
+      type: "info",
+    });
   }
 
   useEffect(() => {
-    const q = (query || '').trim().toLowerCase();
+    const q = (query || "").trim().toLowerCase();
     if (!q) {
-      setFilteredProducts(products);
+      setFilteredProducts(featuredProducts);
       return;
     }
 
+    // When searching, only search within featured products
     setFilteredProducts(
-      products.filter((p) => {
+      featuredProducts.filter((p) => {
         return (
           p.name.toLowerCase().includes(q) ||
-          (p.description || '').toLowerCase().includes(q) ||
-          (p.category || '').toLowerCase().includes(q)
+          (p.description || "").toLowerCase().includes(q) ||
+          (p.category || "").toLowerCase().includes(q)
         );
       })
     );
-  }, [query]);
+  }, [query, featuredProducts]);
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      Birthday: "bg-blue-100 text-blue-800 border-blue-200",
+      Wedding: "bg-purple-100 text-purple-800 border-purple-200",
+      Custom: "bg-green-100 text-green-800 border-green-200",
+      Cupcakes: "bg-pink-100 text-pink-800 border-pink-200",
+      Pastries: "bg-orange-100 text-orange-800 border-orange-200",
+    };
+    return colors[category] || "bg-gray-100 text-gray-800 border-gray-200";
+  };
 
   return (
-    <section id="bestsellers" className="py-16 bg-pastel-cream">
-      <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center text-chocolate-brown mb-12">Best Sellers</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <section
+      id="bestsellers"
+      className="py-16 bg-linear-to-b from-pastel-cream/60 to-white"
+    >
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* heading */}
+        <div className="text-center mb-12">
+          <motion.div
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pastel-pink/20 text-[11px] font-semibold uppercase tracking-[0.25em] text-pink-500 mb-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            ✨ Best sellers
+          </motion.div>
+          <motion.h2
+            className="text-3xl md:text-4xl font-extrabold text-chocolate-brown mb-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            Freshly baked favourites
+          </motion.h2>
+          <motion.p
+            className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+          >
+            Handcrafted cakes and pastries, made with premium ingredients and a
+            whole lot of love.
+          </motion.p>
+        </div>
+
+        {/* cards - Only shows 6 products */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
           {filteredProducts.length === 0 ? (
-            <div className="col-span-full text-center text-gray-500 py-8">No products found for your search.</div>
+            <div className="col-span-full text-center text-gray-500 py-12">
+              <div className="text-6xl mb-4">🍰</div>
+              <p className="text-lg font-semibold mb-2">No products found</p>
+              <p className="text-gray-600">Try adjusting your search terms</p>
+            </div>
           ) : (
-            filteredProducts.slice(0, 6).map((product) => {
-            const cartEntry = cartItems.find((it) => (it.product?.id ?? it.id) === product.id);
-            const qtyValue = quantities[product.id] ?? cartEntry?.quantity ?? 1;
-            return (
-            <motion.div
-              key={product.id}
-              className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition duration-300"
-              whileHover={{ scale: 1.05 }}
-            >
-              <Link href={`/product/${product.id}`}>
-                <img src={product.image} alt={product.name} className="w-full h-48 object-cover" />
-              </Link>
-              <div className="p-6">
-                <h3 className="text-xl font-semibold text-chocolate-brown mb-2">
-                  <Link href={`/product/${product.id}`} className="hover:underline">{product.name}</Link>
-                </h3>
-                <p className="text-gray-600 mb-2">{product.description}</p>
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold text-pastel-pink">₹{product.price}</span>
-                  <div className="flex items-center">
-                    <span className="text-yellow-400 mr-1">★</span>
-                    <span className="text-gray-600">{product.rating}</span>
-                  </div>
-                </div>
-                <div className="flex gap-3 items-center">
-                  { !cartEntry ? (
-                    /* Not in cart: large Add to cart + heart */
-                    <>
-                      <button
-                        onClick={() => {
-                          const qty = quantities[product.id] ?? qtyValue;
-                          addToCart(product, qty);
-                          toast.show(`Added ${qty} × ${product.name} to cart`, { type: 'success' });
-                        }}
-                        className="flex-1 px-6 py-3 rounded-2xl bg-linear-to-r from-[#FCE6F1] via-pastel-pink to-[#FFDDE7] hover:from-[#fdeff7] hover:to-[#ffecf5] text-chocolate-brown font-semibold transition transform hover:-translate-y-0.5 shadow-sm border border-pink-100"
-                      >
-                        Add to cart
-                      </button>
+            filteredProducts.map((product, index) => {
+              const cartEntry = cartItems.find(
+                (it) => (it.product?.id ?? it.id) === product.id
+              );
 
-                      <button
-                        onClick={() => toggleFavorite(product.id)}
-                        aria-label="Toggle favorite"
-                        className={`ml-3 w-11 h-11 rounded-full flex items-center justify-center border ${favorites.includes(product.id) ? 'bg-white border-red-200 text-red-500 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500'}`}
-                      >
-                        <span className="text-lg leading-none">{favorites.includes(product.id) ? '♥' : '♡'}</span>
-                      </button>
-                    </>
-                  ) : (
-                    /* In cart: qty pill | Go to cart | heart */
-                    <>
-                      <div className="inline-flex items-center gap-0 border border-gray-200 rounded-2xl px-3 py-2 bg-white shadow-sm">
-                        <button
-                          aria-label="Decrease qty"
-                          onClick={() => updateQuantity(cartItems.findIndex(it => (it.product?.id ?? it.id) === product.id), Math.max(1, (quantities[product.id] ?? cartEntry.quantity) - 1))}
-                          className="px-1 py-1 rounded-md text-lg text-gray-700 hover:bg-gray-50 transition"
-                        >−</button>
-                        <div className="px-4 py-1 text-base font-semibold">{quantities[product.id] ?? cartEntry.quantity}</div>
-                        <button
-                          aria-label="Increase qty"
-                          onClick={() => updateQuantity(cartItems.findIndex(it => (it.product?.id ?? it.id) === product.id), (quantities[product.id] ?? cartEntry.quantity) + 1)}
-                          className="px-1 py-1 rounded-md text-lg text-gray-700 hover:bg-gray-50 transition"
-                        >+</button>
+              return (
+                <motion.div
+                  key={product.id}
+                  className="group bg-white rounded-3xl shadow-[0_18px_35px_rgba(15,23,42,0.06)] overflow-hidden border border-pastel-cream hover:shadow-[0_22px_45px_rgba(15,23,42,0.10)] transition-all duration-300"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    delay: index * 0.07,
+                    duration: 0.5,
+                  }}
+                  whileHover={{ y: -4 }}
+                >
+                  {/* image + top badges */}
+                  <div className="relative">
+                    <Link href={`/product/${product.id}`}>
+                      <div className="relative h-56 overflow-hidden">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
                       </div>
+                    </Link>
 
-                      <button
-                        onClick={() => openCart()}
-                        className="px-4 py-2 rounded-2xl border-2 border-gray-100 bg-white text-chocolate-brown font-semibold hover:shadow-md transition mx-2"
+                    {/* category badge */}
+                    <div className="absolute top-3 left-3">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getCategoryColor(
+                          product.category
+                        )} backdrop-blur-sm shadow-sm`}
                       >
-                        Go to cart
-                      </button>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-80" />
+                        {product.category}
+                      </span>
+                    </div>
 
+                    {/* fav + rating */}
+                    <div className="absolute top-3 right-3 flex gap-2">
                       <button
                         onClick={() => toggleFavorite(product.id)}
-                        aria-label="Toggle favorite"
-                        className={`w-11 h-11 rounded-full flex items-center justify-center border ${favorites.includes(product.id) ? 'bg-white border-red-200 text-red-500 shadow-sm' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500'}`}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center backdrop-blur-sm transition-all duration-200 ${
+                          favorites.includes(product.id)
+                            ? "bg-red-500 text-white shadow-md"
+                            : "bg-white/95 text-gray-400 hover:text-red-500 hover:shadow-md"
+                        }`}
                       >
-                        <span className="text-lg leading-none">{favorites.includes(product.id) ? '♥' : '♡'}</span>
+                        {favorites.includes(product.id) ? (
+                          <FaHeart className="text-sm" />
+                        ) : (
+                          <FaRegHeart className="text-sm" />
+                        )}
                       </button>
-                    </>
-                  ) }
-                  {/* controls replaced by above conditional block */}
-                </div>
-              </div>
-            </motion.div>
-            );
+                      <span className="bg-white/95 backdrop-blur-sm px-2.5 py-1.5 rounded-xl text-xs font-semibold text-chocolate-brown shadow-sm flex items-center gap-1">
+                        <FaStar className="text-yellow-400 text-xs" />
+                        {product.rating}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* content */}
+                  <div className="p-5 pb-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 pr-2">
+                        <h3 className="text-lg md:text-xl font-semibold text-chocolate-brown mb-1 line-clamp-1">
+                          <Link
+                            href={`/product/${product.id}`}
+                            className="hover:text-pastel-pink transition-colors duration-200"
+                          >
+                            {product.name}
+                          </Link>
+                        </h3>
+                      </div>
+                      <span className="text-xl font-extrabold text-pastel-pink whitespace-nowrap">
+                        ₹{product.price}
+                      </span>
+                    </div>
+
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+                      {product.description}
+                    </p>
+
+                    {/* CTA / quantity */}
+                    {!cartEntry ? (
+                      <motion.button
+                        onClick={() => {
+                          addToCart(product, 1);
+                          toast.show(`Added ${product.name} to cart`, {
+                            type: "success",
+                          });
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-linear-to-r from-pastel-pink to-pink-500 
+               text-white font-semibold text-sm shadow-md 
+               hover:shadow-lg hover:to-pink-400 
+               transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        <FaShoppingCart className="text-[13px]" />
+                        Add to Cart
+                      </motion.button>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Quantity Box */}
+                        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-200">
+                          <button
+                            onClick={() =>
+                              updateQuantity(
+                                cartItems.findIndex(
+                                  (it) =>
+                                    (it.product?.id ?? it.id) === product.id
+                                ),
+                                Math.max(1, cartEntry.quantity - 1)
+                              )
+                            }
+                            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center 
+                   hover:bg-gray-100 transition shadow-sm text-sm font-semibold cursor-pointer"
+                          >
+                            −
+                          </button>
+
+                          <span className="min-w-6 text-center font-semibold text-chocolate-brown text-sm">
+                            {cartEntry.quantity}
+                          </span>
+
+                          <button
+                            onClick={() =>
+                              updateQuantity(
+                                cartItems.findIndex(
+                                  (it) =>
+                                    (it.product?.id ?? it.id) === product.id
+                                ),
+                                cartEntry.quantity + 1
+                              )
+                            }
+                            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center 
+                   hover:bg-gray-100 transition shadow-sm text-sm font-semibold cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* View Cart Button */}
+                        <button
+                          onClick={openCart}
+                          className="px-4 py-2 rounded-xl bg-chocolate-brown text-white 
+                 font-semibold text-sm hover:bg-chocolate-brown/85 
+                 transition shadow-md whitespace-nowrap cursor-pointer"
+                        >
+                          View Cart
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
             })
           )}
         </div>
+
+        {/* view all */}
+        {!query && (
+          <motion.div
+            className="text-center mt-12"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <Link
+              href="/products"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl bg-chocolate-brown text-white font-semibold hover:bg-chocolate-brown/85 transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg hover:shadow-xl group text-sm md:text-base"
+            >
+              View All Products
+              <span className="group-hover:translate-x-1 transition-transform duration-300">
+                →
+              </span>
+            </Link>
+          </motion.div>
+        )}
       </div>
     </section>
   );
